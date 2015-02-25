@@ -7,6 +7,7 @@ module TestAgent
   class TestNode
     include OpenNebula
     include TestAgentConfig
+    include TestAgentLogger
 
     ##
     # Add methods from SikuliScreen class (click, type etc)
@@ -62,7 +63,7 @@ module TestAgent
       mac = vm_info['VM']['TEMPLATE']['NIC']['MAC']
       20.times do
         debug 'Trying to get IP...'
-        out = `echo '#{config[:sudo_pass]}' | sudo -S nmap -sP -n 153.15.248.0/21`
+        out = `echo '#{config[:local_sudo_pass]}' | sudo -S nmap -sP -n 153.15.248.0/21`
         out = out.lines
         index = out.find_index{|s| s =~ /.*#{mac}.*/i}
         if index
@@ -92,7 +93,7 @@ module TestAgent
     # @param vm_name [String] part of machine`s name in OpenNebula (second part is timestamp).
     # @param template_name [String] template used to instantiate new virtual machine.
     # @return [String] name.
-    def initialize(vm_name, template_name)
+    def initialize(vm_name, template_name, auto_destruct_vm = true)
       @name = vm_name
       temp_pool = TemplatePool.new(client, -1)
       rc = temp_pool.info
@@ -127,7 +128,7 @@ module TestAgent
         return nil
       end
       @vm = vir_mac
-      ObjectSpace.define_finalizer(self, proc {delete_vm})
+      ObjectSpace.define_finalizer(self, proc {delete_vm}) if auto_destruct_vm
     end
 
     ##
@@ -192,26 +193,24 @@ module TestAgent
     # @option options [String] :run_list Runlist passed to chef
     # @option options [String] :data Some data passed to chef
     # @option options [String] :ssh_password Ssh password on target machine
+    # @option options [String] :config Path to knife config file
     # @return [true, false] true if node bootstrapped successfully, false otherwise
     def bootstrap( options = {} )
       unless @vm
         warn 'No VM assigned to bootstrap chef-client'
         return
       end
-      options[:ssh_password] ||= '11111111'
+      options[:ssh_password] ||= config[:default_ssh_pass]
       debug 'Bootstrapping...'
       i = 30
       while i && !is_port_open?(ip, '22')
         i -= 1
         sleep(15)
       end
-      cmd = "knife bootstrap #{ip} -P #{options[:ssh_password]} -N #{chef_name} --config #{config[:knife_config_path]}"
-      if options[:run_list]
-        cmd += " -r '#{options[:run_list]}'"
-      end
-      if options[:data]
-        cmd += " -j '#{options[:data]}'"
-      end
+      cmd = "knife bootstrap #{ip} -P #{options[:ssh_password]} -N #{chef_name}"
+      cmd += " --config '#{options[:config]}'" if options[:config]
+      cmd += " -r '#{options[:run_list]}'" if options[:run_list]
+      cmd += " -j '#{options[:data]}'" if options[:data]
       puts `#{cmd}`
       if $?.to_i
         error 'Some error during bootstrapping'

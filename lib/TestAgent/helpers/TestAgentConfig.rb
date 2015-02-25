@@ -9,8 +9,8 @@ module TestAgent
         :opennebula_ip => '153.15.166.199',
         :end_point => 'http://153.15.166.199:2633/RPC2',
         :credentials => 'oneadmin:oneadmin',
-        :sudo_pass => '11111111',
-        :knife_config_path => '/etc/knife/.chef/knife.rb'
+        :local_sudo_pass => '11111111',
+        :default_ssh_pass => '11111111'
     }
     @@valid_config_keys = @@config.keys
 

@@ -7,6 +7,7 @@ module TestAgent
 
     include Sikulix
     include TestAgentConfig
+    include TestAgentLogger
 
     ##
     # Initialize pool with several nodes
