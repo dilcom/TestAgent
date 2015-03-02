@@ -18,6 +18,7 @@ module TestAgent
     #   Optional fields:
     #     runlist - chef run list
     #     options - options passed to chef
+    #     keep_alive - keep vm alive after end of testing
     # @example
     #   TestPool.new({name: "node1", template: "qwerty_temp", run_list: "recipe[webserver]"})
     #   TestPool.new({name: "node1", template: "temp"}, {name: "node2", template: "temp"})
@@ -49,6 +50,7 @@ module TestAgent
     #   Optional fields:
     #     runlist - chef run list
     #     options - options passed to chef
+    #     keep_alive - keep vm alive after end of testing
     # @example
     #   TestPool.new({name: "node1", template: "qwerty_temp", run_list: "recipe[webserver]"})
     #   TestPool.new({name: "node1", template: "temp"}, {name: "node2", template: "temp"})
@@ -58,7 +60,7 @@ module TestAgent
       tries_left = 3
       until tmp.empty? || !tries_left
         tmp.first(2).each do |hash|
-          @nodes[hash[:name]] = TestNode.new(hash[:name], hash[:template])
+          @nodes[hash[:name]] = TestNode.new(hash[:name], hash[:template], hash[:keep_alive])
         end
         tmp.select! do |hash|
           node = @nodes[hash[:name]]
@@ -68,7 +70,7 @@ module TestAgent
       end
       args.each do |hash|
         if hash[:run_list]
-          @nodes[hash[:name]].bootstrap(hash[:run_list], hash[:options])
+          @nodes[hash[:name]].bootstrap(run_list: hash[:run_list], data: hash[:options])
         end
       end
       self
