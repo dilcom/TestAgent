@@ -85,6 +85,7 @@ module TestAgent
       locate_vm(id).finalize
       @vm = nil
       @ip = nil
+      system("knife node delete #{chef_name} -y")
       true
     end
 

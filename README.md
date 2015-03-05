@@ -27,9 +27,10 @@ pckg = artifacts.get_file_url("./serv*", /192/)
 # Create two VM's: server and test-client0. 
 # Bootstrap Chef client on server with role web-server
 # and option package_url.
+# Because of option keep_alive set to true, test-client0 will remain undeleted after end of testing
 pool = TestPool.new(
 {name: 'server', template: 'opensuse13.2', run_list: 'role[web-server]', options: "{package_url: #{pckg}}"},
-{name: 'test-client0', template: 'win8.1'} )
+{name: 'test-client0', template: 'win8.1', keep_alive: true} )
 
 # Open VNC connection on test-client0
 pool.init_vnc_screens('test-client0')
