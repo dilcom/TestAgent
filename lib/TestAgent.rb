@@ -7,6 +7,10 @@ require 'pathname'
 require 'logger'
 require 'time'
 
+module TestAgent
+  extend Sikulix
+end
+
 # Internal modules and classes
 require 'TestAgent/version'
 require 'TestAgent/helpers/TestAgentLogger.rb'

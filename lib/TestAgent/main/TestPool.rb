@@ -5,7 +5,6 @@ module TestAgent
   # and offers Sikulix VNC screens initializing
   class TestPool
 
-    include Sikulix
     include TestAgentConfig
     include TestAgentLogger
 
@@ -108,6 +107,7 @@ module TestAgent
         el.set_vnc_screen($VNC_SCREEN_POOL[index])
       end
       @vnc_initialized = true
+      ObjectSpace.define_finalizer(self, proc {freeVNCPool})
     end
   end
 

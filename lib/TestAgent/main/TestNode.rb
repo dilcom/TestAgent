@@ -211,8 +211,7 @@ module TestAgent
       cmd += " --config '#{options[:config]}'" if options[:config]
       cmd += " -r '#{options[:run_list]}'" if options[:run_list]
       cmd += " -j '#{options[:data]}'" if options[:data]
-      puts `#{cmd}`
-      if $?.to_i
+      unless system("#{cmd}")
         error 'Some error during bootstrapping'
         return false
       end
