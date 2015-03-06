@@ -1,10 +1,8 @@
 module TestAgent
-
   ##
   # Contains several testing nodes
   # and offers Sikulix VNC screens initializing
   class TestPool
-
     include TestAgentConfig
     include TestAgentLogger
 
@@ -30,19 +28,25 @@ module TestAgent
     # Standard each method
     # @param regexp [Regexp] used to choose nodes (name =~ regexp) to run each on
     def each(regexp = nil)
-      unless block_given?
-        return nil
-      end
+      return nil unless block_given?
       @nodes.each do |name, node|
-        if !regexp || name =~ regexp
-          yield name, node
+        yield(name, node) if !regexp || name =~ regexp
+      end
+    end
+
+    ##
+    # Bootstrap some nodes if they contain necessary params
+    def bootstrap(nodes)
+      nodes.each do |node|
+        if node[:run_list]
+          @nodes[node[:name]].bootstrap(run_list: node[:run_list], data: node[:options])
         end
       end
     end
 
     ##
     # Initialize pool with several nodes
-    # @param args several hashes each containing:
+    # @param nodes several hashes each containing:
     #   Necessary fields:
     #     name - node name (should be unique for that pool)
     #     template - OpenNebula template name
@@ -53,9 +57,8 @@ module TestAgent
     # @example
     #   TestPool.new({name: "node1", template: "qwerty_temp", run_list: "recipe[webserver]"})
     #   TestPool.new({name: "node1", template: "temp"}, {name: "node2", template: "temp"})
-
-    def <<(*args)
-      tmp = args
+    def <<(*nodes)
+      tmp = nodes
       tries_left = 3
       until tmp.empty? || !tries_left
         tmp.first(2).each do |hash|
@@ -67,11 +70,7 @@ module TestAgent
         end
         tries_left -= 1
       end
-      args.each do |hash|
-        if hash[:run_list]
-          @nodes[hash[:name]].bootstrap(run_list: hash[:run_list], data: hash[:options])
-        end
-      end
+      bootstrap(nodes)
       self
     end
 
@@ -91,24 +90,19 @@ module TestAgent
     #   init_vnc_screens "node1", "node5", "node9"
     def init_vnc_screens(*names)
       nodes = names.size == 0 ? @nodes : @nodes.select { |name| names.include? name }
-      if @vnc_initialized
-        return false
-      end
-      address_array = nodes.map do |name, el|
+      return false if @vnc_initialized
+      address_array = nodes.map do |_name, el|
         a = "#{config[:opennebula_ip]}:#{5900 + el.id}"
         debug "Node address: #{a}"
         a
       end
-      if address_array.empty?
-        return false
-      end
+      return false if address_array.empty?
       initVNCPool(*address_array)
-      nodes.each_with_index do |(name, el), index|
-        el.set_vnc_screen($VNC_SCREEN_POOL[index])
+      nodes.each_with_index do |(_name, el), index|
+        el.vnc_screen = $VNC_SCREEN_POOL[index]
       end
       @vnc_initialized = true
-      ObjectSpace.define_finalizer(self, proc {freeVNCPool})
+      ObjectSpace.define_finalizer(self, proc { freeVNCPool })
     end
   end
-
 end

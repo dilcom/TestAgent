@@ -5,20 +5,25 @@ module TestAgent
   module TestAgentConfig
     extend TestAgentLogger
 
+    ##
+    # Config defaults
     @@config = {
-        :opennebula_ip => '153.15.166.199',
-        :end_point => 'http://153.15.166.199:2633/RPC2',
-        :credentials => 'oneadmin:oneadmin',
-        :local_sudo_pass => '11111111',
-        :default_ssh_pass => '11111111'
+      opennebula_ip: '127.0.0.1',
+      end_point: 'http://127.0.0.1:2633/RPC2',
+      credentials: 'oneadmin:oneadmin',
+      local_sudo_pass: 'password',
+      default_ssh_pass: 'password',
+      default_interface_ip: /^127.*/
     }
-    @@valid_config_keys = @@config.keys
 
     ##
     # Configure through hash.
     # @param opts [Hash] - config options.
     def self.configure(opts = {})
-      opts.each {|k,v| @@config[k.to_sym] = v if @@valid_config_keys.include? k.to_sym}
+      valid_config_keys = @@config.keys
+      opts.each do |k, v|
+        @@config[k.to_sym] = v if valid_config_keys.include? k.to_sym
+      end
     end
 
     ##
@@ -26,11 +31,13 @@ module TestAgent
     # @param path_to_yaml_file [String] - path to config file.
     def self.configure_with(path_to_yaml_file)
       begin
-        conf = YAML::load(IO.read(path_to_yaml_file))
+        conf = YAML.load(IO.read(path_to_yaml_file))
       rescue Errno::ENOENT
-        warn("YAML configuration file couldn't be found. Using defaults."); return
+        warn "YAML configuration file couldn't be found. Using defaults."
+        return
       rescue Psych::SyntaxError
-        warn('YAML configuration file contains invalid syntax. Using defaults.'); return
+        warn 'YAML configuration file contains invalid syntax. Using defaults.'
+        return
       end
       configure(conf)
     end
@@ -45,5 +52,4 @@ module TestAgent
     # Search for config in default location
     configure_with '/etc/chef-opennebula/config.yaml'
   end
-
 end

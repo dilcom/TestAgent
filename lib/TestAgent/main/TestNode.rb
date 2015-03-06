@@ -1,5 +1,4 @@
 module TestAgent
-  
   ##
   # Class contains OpenNebula virtual machine
   # and offers interface for bootstrapping chef node
@@ -8,6 +7,9 @@ module TestAgent
     include OpenNebula
     include TestAgentConfig
     include TestAgentLogger
+
+    attr_reader :name
+    attr_accessor :vnc_screen
 
     ##
     # Add methods from SikuliScreen class (click, type etc)
@@ -21,12 +23,11 @@ module TestAgent
       end
     end
 
-
     ##
     # Get client used to connect to OpenNebula host.
     # @return [OpenNebula::Client] client.
     def client
-      @@client ||= Client.new(config[:credentials], config[:end_point])
+      @client ||= Client.new(config[:credentials], config[:end_point])
     end
 
     ##
@@ -40,7 +41,7 @@ module TestAgent
         error rc.message
         return
       end
-      vm = vm_pool.find{|el| el.id == vm_id }
+      vm = vm_pool.find { |el| el.id == vm_id }
       unless "#{vm.class}" == 'OpenNebula::VirtualMachine'
         error "VM Not found #{vm.class}"
         return
@@ -48,29 +49,35 @@ module TestAgent
       vm
     end
 
+
     ##
-    # Get node`s ip address.
-    # @return [String] ip address.
+    # Detect node`s ip address.
+    # @return [String, nil] ip address or nil if it couldn't be found.
     # TODO: improve that method (setup a dhcp server and make it's table accessible outside)
-    def ip
-      if @ip
-        return @ip
-      end
-      unless @vm
-        warn 'No Vm assigned to locate IP'
-        return
-      end
+    def detect_ip
       mac = vm_info['VM']['TEMPLATE']['NIC']['MAC']
       20.times do
         debug 'Trying to get IP...'
         out = `echo '#{config[:local_sudo_pass]}' | sudo -S nmap -sP -n 153.15.248.0/21`
         out = out.lines
-        index = out.find_index{|s| s =~ /.*#{mac}.*/i}
+        index = out.find_index { |s| s =~ /.*#{mac}.*/i }
         if index
-          return @ip = out.to_a[index - 2].scan(/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)[0]
+          return out.to_a[index - 2].scan(/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/)[0]
         end
       end
+      warn "Can't locate VM ip"
       nil
+    end
+
+    ##
+    # Get node`s ip address.
+    # @return [String, nil] ip address or nil if it couldn't be found.
+    def ip
+      unless @vm
+        warn 'No Vm assigned to locate IP'
+        return
+      end
+      @ip |= detect_ip
     end
 
     ##
@@ -102,13 +109,13 @@ module TestAgent
         error rc.message
         return nil
       end
-      template = temp_pool.find{|el| el.name == template_name }
+      template = temp_pool.find { |el| el.name == template_name }
       unless "#{template.class}" == 'OpenNebula::Template'
         error "Template Not found #{template.class}"
         return nil
       end
       vir_mac = false
-      until vir_mac do
+      until vir_mac
         vm_id = template.instantiate("#{vm_name}(#{Time.now.utc.iso8601})")
         if OpenNebula.is_error?(vm_id)
           error "Some problem in instantiating template\n#{vm_id.message}"
@@ -119,17 +126,15 @@ module TestAgent
           error 'Some problem in instantiating template'
           return nil
         end
-        vir_mac = locate_vm(vm_id) #locate vm inside pool by id, wait for start
-        unless vir_mac
-          delete_vm
-        end
+        vir_mac = locate_vm(vm_id) # locate vm inside pool by id, wait for start
+        delete_vm unless vir_mac
       end
       unless "#{vir_mac.class}" == 'OpenNebula::VirtualMachine'
         error 'Some problem in Getting Virtual Machine'
         return nil
       end
       @vm = vir_mac
-      ObjectSpace.define_finalizer(self, proc {delete_vm}) unless keep_vm_alive
+      ObjectSpace.define_finalizer(self, proc { delete_vm }) unless keep_vm_alive
     end
 
     ##
@@ -159,20 +164,13 @@ module TestAgent
     end
 
     ##
-    # Get name given at creation.
-    # @return [String] name.
-    def name
-      @name
-    end
-
-    ##
     # Check if port open.
     # @param ip [String] target ip address.
     # @param port [String] target port.
     # @return [true, false] true if port is open false otherwise.
-    def is_port_open?(ip, port)
+    def port_open?(ip, port)
       begin
-        Timeout::timeout(10) do
+        Timeout.timeout(10) do
           begin
             s = TCPSocket.new(ip, port)
             s.close
@@ -182,10 +180,19 @@ module TestAgent
           end
         end
       rescue Timeout::Error
-        # ignored
+        return false
       end
+    end
 
-      false
+    ##
+    # Formats bootstrap command from options
+    def bootstrap_command(options)
+      options[:ssh_password] ||= config[:default_ssh_pass]
+      cmd = "knife bootstrap #{ip} -P #{options[:ssh_password]} -N #{chef_name}"
+      cmd += " --config '#{options[:config]}'" if options[:config]
+      cmd += " -r '#{options[:run_list]}'" if options[:run_list]
+      cmd += " -j '#{options[:data]}'" if options[:data]
+      cmd
     end
 
     ##
@@ -196,35 +203,20 @@ module TestAgent
     # @option options [String] :ssh_password Ssh password on target machine
     # @option options [String] :config Path to knife config file
     # @return [true, false] true if node bootstrapped successfully, false otherwise
-    def bootstrap( options = {} )
+    def bootstrap(options = {})
       unless @vm
         warn 'No VM assigned to bootstrap chef-client'
-        return
+        return false
       end
-      options[:ssh_password] ||= config[:default_ssh_pass]
       debug 'Bootstrapping...'
       i = 30
-      while i && !is_port_open?(ip, '22')
+      while i && !port_open?(ip, '22')
         i -= 1
         sleep(15)
       end
-      cmd = "knife bootstrap #{ip} -P #{options[:ssh_password]} -N #{chef_name}"
-      cmd += " --config '#{options[:config]}'" if options[:config]
-      cmd += " -r '#{options[:run_list]}'" if options[:run_list]
-      cmd += " -j '#{options[:data]}'" if options[:data]
-      unless system("#{cmd}")
-        error 'Some error during bootstrapping'
-        return false
-      end
-      true
-    end
-
-    ##
-    # Set VNC screen for that machine to perform SikuliX actions.
-    # @param screen [VNCScreen] VNC screen connected to that machine.
-    # @return [VNCScreen] VNC screen.
-    def set_vnc_screen(screen)
-      @vnc_screen = screen
+      result = system("#{bootstrap_command(options)}")
+      error 'Some error during bootstrapping' unless result
+      result
     end
 
     ##
@@ -236,16 +228,17 @@ module TestAgent
         return false
       end
       inf = vm_info
-      while [0,1,2].include? inf['VM']['LCM_STATE'].to_i #wait while vm is waiting for instantiating
+      # wait while vm is waiting for instantiating
+      while [0, 1, 2].include? inf['VM']['LCM_STATE'].to_i
         sleep 10
         inf = vm_info
       end
       inf['VM']['STATE'].to_i == 3 # state 3 - VM is running
     end
 
-    private :is_port_open?, :delete_vm, :client, :locate_vm
+    private :port_open?, :delete_vm, :client, :locate_vm, :detect_ip,
+            :bootstrap_command
 
     # TODO: add some method to allow changing Chef runlist during testing
   end
-  
 end

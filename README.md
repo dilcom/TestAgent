@@ -10,7 +10,7 @@ Gem works with sikulix > 1.1.0.3 and OpenNebula ~> 3.8 gems. Of course you need 
 
 I'm not going to push the gem to RubyGems so you can download it and install locally:
 
-    $ gem install --local TestAgent-0.1.0.gem
+    $ gem install --local TestAgent-0.1.1.gem
 
 ## Usage
 
@@ -21,7 +21,7 @@ include TestAgent
 # Share folder ./build-result/ via HTTP on some free port:
 artifacts = SharedFolder.new "./build-result/"
 # Get absollete external url to file named server-videowall-v1.0.1.rpm
-pckg = artifacts.get_file_url("./serv*", /192/) 
+pckg = artifacts.file_url("./serv*", /192/) 
 #=> "http://192.168.12.3:32145/server-v1.0.1.rpm"
 
 # Create two VM's: server and test-client0. 

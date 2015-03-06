@@ -3,6 +3,7 @@ module TestAgent
   # Object of class represents
   # a folder shared via HTTP
   class SharedFolder
+    include TestAgentConfig
     include TestAgentLogger
 
     ##
@@ -40,7 +41,7 @@ module TestAgent
 
     ##
     # Creates and starts a HTTP server sharing folder
-    # @param args; first param - path to folder, second - port
+    # @param args first param - path to folder, second - port
     def initialize(*args)
       start(*args)
       ObjectSpace.define_finalizer(self, proc { kill })
@@ -48,17 +49,16 @@ module TestAgent
 
     ##
     # Creates a HTTP url to some file inside folder
-    # @param file_path [String] path to file relative to shared directory (e.g. './lib/*.rb')
+    # @param file_path [String] path to file relative to shared directory
     # @param ip_regexp [Regexp] regular expression used to choose net interface
-    def file_url(file_path, ip_regexp = /^153.*/)
-      ip = Socket.ip_address_list.detect{ |int| int.ip_address =~ ip_regexp }.ip_address
+    # @example
+    #   file_url('./lib/*.rb')
+    def file_url(file_path, ip_regexp = config[:default_interface_ip])
+      ip = Socket.ip_address_list.detect { |int| int.ip_address =~ ip_regexp }.ip_address
       files = Dir.glob(File.expand_path(@path) + '/' + file_path)
       if files.size < 1
         warn "No file found by path #{file_path}"
         return
-      end
-      if files.size > 1
-        warn 'More than one file found by that path, using first'
       end
       absolute_path = Pathname.new(files[0])
       project_root  = Pathname.new(File.expand_path(@path))
@@ -68,5 +68,4 @@ module TestAgent
 
     private :find_free_port
   end
-
 end
