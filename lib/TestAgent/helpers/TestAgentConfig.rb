@@ -13,7 +13,7 @@ module TestAgent
       credentials: 'oneadmin:oneadmin',
       local_sudo_pass: 'password',
       default_ssh_pass: 'password',
-      default_interface_ip: /^127.*/
+      default_interface_ip: '/^127.*/'
     }
 
     ##
@@ -50,6 +50,6 @@ module TestAgent
     end
 
     # Search for config in default location
-    configure_with '/etc/chef-opennebula/config.yaml'
+    configure_with '/etc/test-agent/config.yaml'
   end
 end

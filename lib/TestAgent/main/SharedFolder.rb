@@ -44,7 +44,6 @@ module TestAgent
     # @param args first param - path to folder, second - port
     def initialize(*args)
       start(*args)
-      ObjectSpace.define_finalizer(self, proc { kill })
     end
 
     ##
@@ -53,8 +52,8 @@ module TestAgent
     # @param ip_regexp [Regexp] regular expression used to choose net interface
     # @example
     #   file_url('./lib/*.rb')
-    def file_url(file_path, ip_regexp = config[:default_interface_ip])
-      ip = Socket.ip_address_list.detect { |int| int.ip_address =~ ip_regexp }.ip_address
+    def file_url(file_path, ip_regexp = Regexp.new(config[:default_interface_ip]))
+      ip = Socket.ip_address_list.detect{ |int| int.ip_address =~ ip_regexp }.ip_address
       files = Dir.glob(File.expand_path(@path) + '/' + file_path)
       if files.size < 1
         warn "No file found by path #{file_path}"

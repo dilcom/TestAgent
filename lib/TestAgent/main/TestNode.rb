@@ -77,7 +77,7 @@ module TestAgent
         warn 'No Vm assigned to locate IP'
         return
       end
-      @ip |= detect_ip
+      @ip ||= detect_ip
     end
 
     ##
@@ -88,11 +88,11 @@ module TestAgent
         info 'No VM assigned, nothing to delete'
         return false
       end
+      system("knife node delete #{chef_name} -y")
       # TODO: make changes here after switching to newer version of OpenNebula
       locate_vm(id).finalize
       @vm = nil
       @ip = nil
-      system("knife node delete #{chef_name} -y")
       true
     end
 
@@ -134,7 +134,6 @@ module TestAgent
         return nil
       end
       @vm = vir_mac
-      ObjectSpace.define_finalizer(self, proc { delete_vm }) unless keep_vm_alive
     end
 
     ##
@@ -236,7 +235,7 @@ module TestAgent
       inf['VM']['STATE'].to_i == 3 # state 3 - VM is running
     end
 
-    private :port_open?, :delete_vm, :client, :locate_vm, :detect_ip,
+    private :port_open?, :client, :locate_vm, :detect_ip,
             :bootstrap_command
 
     # TODO: add some method to allow changing Chef runlist during testing

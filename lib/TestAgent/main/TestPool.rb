@@ -60,7 +60,7 @@ module TestAgent
     def <<(*nodes)
       tmp = nodes
       tries_left = 3
-      until tmp.empty? || !tries_left
+      until tmp.empty? || tries_left <= 0
         tmp.first(2).each do |hash|
           @nodes[hash[:name]] = TestNode.new(hash[:name], hash[:template], hash[:keep_alive])
         end
@@ -102,7 +102,11 @@ module TestAgent
         el.vnc_screen = $VNC_SCREEN_POOL[index]
       end
       @vnc_initialized = true
-      ObjectSpace.define_finalizer(self, proc { freeVNCPool })
+    end
+
+    def free_pool
+      freeVNCPool
+      each { |name, vm| vm.delete_vm }
     end
   end
 end
